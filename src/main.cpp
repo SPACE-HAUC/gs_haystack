@@ -26,9 +26,20 @@ int main(int argc, char **argv)
     // Broken pipe signal will crash the process, and it caused by sending data to a closed socket.
     signal(SIGPIPE, SIG_IGN);
 
+    // Read password from .pass file.
+    char hash_pass[256] = {0};
+    FILE *fp = fopen("auth.pass", "r");
+    if (fp == NULL)
+    {
+        dbprintlf(FATAL "Failed to open auth.pass, does it exist?");
+        return -1;
+    }
+    fgets(hash_pass, sizeof(hash_pass), fp);
+    fclose(fp);
+
     // Set up global data.
     global_data_t global[1] = {0};
-    global->network_data = new NetDataClient(NetPort::HAYSTACK, SERVER_POLL_RATE);
+    global->network_data = new NetDataClient(SERVER_IP, NetPort::HAYSTACK, NetVertex::HAYSTACK, SERVER_POLL_RATE, sha1_hash_t(hash_pass, sizeof(hash_pass)));
 
     // Create Ground Station Network thread IDs.
     pthread_t net_polling_tid, net_rx_tid, xband_rx_tid, xband_status_tid;
@@ -80,7 +91,8 @@ int main(int argc, char **argv)
     adradio_destroy(global->radio);
 
     // Destroy other things.
-    close(global->network_data->socket);
+    // close(global->network_data->socket);
+    global->network_data->Close();
 
     int retval = global->network_data->thread_status;
     delete global->network_data;
